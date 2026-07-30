@@ -57,7 +57,11 @@
     </div>
 
     <div class="card" id="gameCard" style="display:none">
-        <h3 id="activityName">活動載入中…</h3>
+        <div class="row" style="justify-content:space-between; align-items:center">
+            <h3 id="activityName" style="margin:0">活動載入中…</h3>
+            <select id="activitySelect" onchange="switchActivity()"
+                    style="padding:7px; border:1px solid #ccc; border-radius:6px"></select>
+        </div>
         <div class="wheel-box">
             <div class="pointer"></div>
             <canvas id="wheel" width="320" height="320"></canvas>
@@ -80,7 +84,7 @@
 </div>
 
 <script>
-    const ACTIVITY_ID = 1;
+    let activityId = null;
     let token = null;
     let prizes = [];
     let currentAngle = 0;
@@ -107,24 +111,53 @@
             document.getElementById("userInfo").style.display = "flex";
             document.getElementById("gameCard").style.display = "block";
             document.getElementById("recordCard").style.display = "block";
-            await loadActivity();
-            await loadRecords();
-            await loadQuota();
+            await loadActivities();
         } catch (e) {
             document.getElementById("loginMsg").textContent = "登入失敗：" + e.message;
         }
     }
 
+    // populate the activity dropdown with the currently ACTIVE activities
+    async function loadActivities() {
+        const list = await api("/api/activities");
+        const sel = document.getElementById("activitySelect");
+        sel.innerHTML = "";
+        list.forEach(a => {
+            const opt = document.createElement("option");
+            opt.value = a.id;
+            opt.textContent = a.name;
+            sel.appendChild(opt);
+        });
+        if (list.length) {
+            activityId = list[0].id;
+            await refresh();
+        } else {
+            document.getElementById("activityName").textContent = "目前沒有進行中的活動";
+        }
+    }
+
+    async function switchActivity() {
+        activityId = Number(document.getElementById("activitySelect").value);
+        document.getElementById("result").textContent = "";
+        await refresh();
+    }
+
+    async function refresh() {
+        await loadActivity();
+        await loadRecords();
+        await loadQuota();
+    }
+
     async function loadQuota() {
         try {
-            const q = await api("/api/activities/" + ACTIVITY_ID + "/my-quota");
+            const q = await api("/api/activities/" + activityId + "/my-quota");
             document.getElementById("quota").textContent =
                 "剩餘可抽次數：" + q.remaining + " / " + q.perUserDrawLimit + "（已抽 " + q.used + " 次）";
         } catch (e) { /* ignore */ }
     }
 
     async function loadActivity() {
-        const detail = await api("/api/activities/" + ACTIVITY_ID);
+        const detail = await api("/api/activities/" + activityId);
         document.getElementById("activityName").textContent = detail.name;
         prizes = detail.prizes;
         drawWheel();
@@ -163,7 +196,7 @@
         document.getElementById("result").textContent = "抽獎中…";
         try {
             // idempotencyKey left blank -> backend generates one per request
-            const result = await api("/api/activities/" + ACTIVITY_ID + "/draws",
+            const result = await api("/api/activities/" + activityId + "/draws",
                 { method: "POST", body: JSON.stringify({ times }) });
             // spin the wheel to the first outcome for a bit of flair
             const first = result.outcomes[0];
@@ -213,7 +246,7 @@
 
     async function loadRecords() {
         try {
-            const records = await api("/api/activities/" + ACTIVITY_ID + "/my-records");
+            const records = await api("/api/activities/" + activityId + "/my-records");
             const ul = document.getElementById("records");
             ul.innerHTML = "";
             records.slice(0, 15).forEach(r => {
