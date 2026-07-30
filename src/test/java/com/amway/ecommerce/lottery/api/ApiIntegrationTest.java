@@ -121,8 +121,8 @@ class ApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_PROBABILITY_CONFIG"));
 
-        // add the THANKS row so the probabilities sum to 10000 -> activation succeeds
-        addPrize(token, activityId, "銘謝惠顧", "THANKS", 9000, 0);
+        // add another real prize so non-THANKS prizes sum to 10000 -> activation succeeds
+        addPrize(token, activityId, "填充獎", "PRIZE", 9000, 0);
         mvc.perform(activate(token, activityId, "IT config", 5))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("ACTIVE"));
