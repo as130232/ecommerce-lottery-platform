@@ -39,8 +39,8 @@ public class AuthController {
     @PostMapping("/login")
     @Operation(summary = "登入取得 JWT")
     public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        String token = authService.login(request.username(), request.password());
-        return ApiResponse.ok(new LoginResponse(token, "Bearer", jwtService.getExpirationMinutes() * 60));
+        AuthService.LoginResult result = authService.login(request.username(), request.password());
+        return ApiResponse.ok(new LoginResponse(result.token(), "Bearer", jwtService.getExpirationMinutes() * 60, result.role()));
     }
 
     public record RegisterRequest(
@@ -53,6 +53,6 @@ public class AuthController {
             @NotBlank String password) {
     }
 
-    public record LoginResponse(String accessToken, String tokenType, long expiresInSeconds) {
+    public record LoginResponse(String accessToken, String tokenType, long expiresInSeconds, String role) {
     }
 }

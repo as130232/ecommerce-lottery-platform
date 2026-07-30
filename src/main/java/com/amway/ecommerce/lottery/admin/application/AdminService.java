@@ -52,7 +52,10 @@ public class AdminService {
         });
         LotteryActivity activity = new LotteryActivity(req.code(), req.name(), req.perUserDrawLimit());
         activity.setTotalDrawLimit(req.totalDrawLimit());
-        return activityRepository.save(activity);
+        LotteryActivity saved = activityRepository.save(activity);
+        prizeRepository.save(new Prize(saved.getId(), "銘謝惠顧", PrizeType.THANKS,
+                ProbabilityConfigValidator.TOTAL, 0));
+        return saved;
     }
 
     @Transactional
@@ -71,13 +74,15 @@ public class AdminService {
 
     @Transactional
     public Prize addPrize(Long activityId, CreatePrizeRequest req) {
-        getActivity(activityId); // ensure exists
+        getActivity(activityId);
         PrizeType type = parseType(req.type());
+        if (type == PrizeType.THANKS) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "銘謝惠顧由系統自動管理，無需手動新增");
+        }
         Prize prize = new Prize(activityId, req.name(), type, req.probability(), req.totalStock());
         Prize saved = prizeRepository.save(prize);
-        if (!saved.isThanks()) {
-            riskControl.initStock(saved.getId(), saved.getRemainingStock());
-        }
+        riskControl.initStock(saved.getId(), saved.getRemainingStock());
+        syncThanks(activityId);
         return saved;
     }
 
@@ -85,17 +90,18 @@ public class AdminService {
     public Prize updatePrize(Long prizeId, UpdatePrizeRequest req) {
         Prize prize = prizeRepository.findById(prizeId)
                 .orElseThrow(() -> new ResourceNotFoundException("獎品不存在: " + prizeId));
+        prize.setName(req.name());
+        if (prize.isThanks()) {
+            return prizeRepository.save(prize); // only name is editable; probability is auto-managed
+        }
         if (req.remainingStock() > req.totalStock()) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "剩餘庫存不可大於總庫存");
         }
-        prize.setName(req.name());
         prize.setProbability(req.probability());
         prize.adjustStock(req.totalStock(), req.remainingStock());
         Prize saved = prizeRepository.save(prize);
-        // keep the Redis counter in sync with the new configuration
-        if (!saved.isThanks()) {
-            riskControl.initStock(saved.getId(), saved.getRemainingStock());
-        }
+        riskControl.initStock(saved.getId(), saved.getRemainingStock());
+        syncThanks(prize.getActivityId());
         return saved;
     }
 
@@ -103,13 +109,15 @@ public class AdminService {
     public void deletePrize(Long prizeId) {
         Prize prize = prizeRepository.findById(prizeId)
                 .orElseThrow(() -> new ResourceNotFoundException("獎品不存在: " + prizeId));
+        if (prize.isThanks()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "銘謝惠顧由系統自動管理，無法刪除");
+        }
         if (drawRecordRepository.existsByPrizeId(prizeId)) {
             throw new BusinessException(ErrorCode.CONFLICT, "獎品已有抽獎紀錄，無法刪除");
         }
         prizeRepository.delete(prize);
-        if (!prize.isThanks()) {
-            riskControl.initStock(prizeId, 0);
-        }
+        riskControl.initStock(prizeId, 0);
+        syncThanks(prize.getActivityId());
     }
 
     @Transactional(readOnly = true)
@@ -124,6 +132,24 @@ public class AdminService {
         long totalDraws = drawRecordRepository.countByActivityId(activityId);
         long thanks = drawRecordRepository.countByActivityIdAndResult(activityId, DrawResult.THANKS);
         return new StatsView(activityId, activity.getCode(), totalDraws, thanks, prizeStats);
+    }
+
+    private void syncThanks(Long activityId) {
+        List<Prize> prizes = prizeRepository.findByActivityId(activityId);
+        int usedProb = prizes.stream()
+                .filter(p -> !p.isThanks())
+                .mapToInt(Prize::getProbability)
+                .sum();
+        if (usedProb > ProbabilityConfigValidator.TOTAL) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR,
+                    "獎品機率總和不可超過 100%（目前 " + String.format("%.2f", usedProb / 100.0) + "%）");
+        }
+        Prize thanks = prizes.stream()
+                .filter(Prize::isThanks)
+                .findFirst()
+                .orElseGet(() -> new Prize(activityId, "銘謝惠顧", PrizeType.THANKS, 0, 0));
+        thanks.setProbability(ProbabilityConfigValidator.TOTAL - usedProb);
+        prizeRepository.save(thanks);
     }
 
     private void validateProbabilities(Long activityId) {

@@ -32,13 +32,15 @@ public class AuthService {
         userRepository.save(user);
     }
 
+    public record LoginResult(String token, String role) {}
+
     @Transactional(readOnly = true)
-    public String login(String username, String rawPassword) {
+    public LoginResult login(String username, String rawPassword) {
         AppUser user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED, "帳號或密碼錯誤"));
         if (!passwordEncoder.matches(rawPassword, user.getPasswordHash())) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "帳號或密碼錯誤");
         }
-        return jwtService.generateToken(user);
+        return new LoginResult(jwtService.generateToken(user), user.getRole().name());
     }
 }

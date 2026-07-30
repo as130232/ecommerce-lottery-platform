@@ -84,7 +84,7 @@
                 <button onclick="saveActivity()">儲存活動</button>
                 <span class="flash" id="editMsg"></span>
             </div>
-            <p class="muted" style="margin:8px 0 0">提示：機率以百分比（%）輸入，最小 0.01%，總和須為 100%。狀態設為 ACTIVE 時後端會進行驗證。</p>
+            <p class="muted" style="margin:8px 0 0">提示：機率以百分比（%）輸入，最小 0.01%。銘謝惠顧機率由系統自動填補剩餘，總和永遠為 100%。</p>
 
             <h3 style="margin-top:18px">獎品設定 <span id="sumInfo" class="flash"></span></h3>
             <div id="probWarn" style="display:none; color:#c8102e; font-size:13px; margin:4px 0 8px; font-weight:600;"></div>
@@ -93,10 +93,17 @@
                 <tbody id="prizeRows"></tbody>
             </table>
 
+            <div style="margin-top:10px; padding:10px 14px; background:#f0f7f0; border-radius:6px; border:1px solid #c3e6c3; font-size:13px;">
+                <input type="hidden" id="thanksId"/>
+                <strong>銘謝惠顧</strong>
+                <span style="color:#555; margin-left:8px">機率：<strong id="thanksProb">—</strong>（自動填補剩餘）</span>
+                <span style="margin-left:16px">名稱：<input id="thanksName" style="width:110px; padding:5px;"/> <button class="mini" onclick="saveThanksName()">儲存名稱</button></span>
+            </div>
+
             <div style="margin-top:12px">
                 <strong style="font-size:13px">新增獎品：</strong>
                 <input id="np_name" placeholder="名稱"/>
-                <select id="np_type"><option>PRIZE</option><option>THANKS</option></select>
+                <select id="np_type"><option>PRIZE</option></select>
                 <input id="np_prob" class="sm" type="number" placeholder="機率(%)" step="0.01" min="0.01" max="100"/>
                 <input id="np_stock" class="sm" type="number" placeholder="庫存"/>
                 <button class="mini" onclick="addPrize()">新增</button>
@@ -137,6 +144,10 @@
             const data = await api("/api/auth/login", { method: "POST",
                 body: JSON.stringify({ username,
                                        password: document.getElementById("password").value }) });
+            if (data.role !== "ADMIN") {
+                flash("loginMsg", "權限不足，此帳號無法進入後台", false);
+                return;
+            }
             token = data.accessToken;
             localStorage.setItem("lotteryToken", token);
             localStorage.setItem("lotteryUser", username);
@@ -227,9 +238,10 @@
     function renderPrizes(prizes) {
         const tbody = document.getElementById("prizeRows");
         tbody.innerHTML = "";
-        let sum = 0;
+        let thanksItem = null;
+
         prizes.forEach(p => {
-            sum += p.probability;
+            if (p.type === "THANKS") { thanksItem = p; return; }
             const displayProb = (p.probability / 100).toFixed(2);
             const tr = document.createElement("tr");
             tr.innerHTML = `
@@ -250,10 +262,15 @@
             tr.querySelector("[data-del]").onclick = () => deletePrize(p.id, p.name);
             tbody.appendChild(tr);
         });
+
         const info = document.getElementById("sumInfo");
-        const displaySum = (sum / 100).toFixed(2);
-        info.textContent = `機率總和：${displaySum} / 100.00%`;
-        info.className = "flash " + (sum === 10000 ? "sum-ok" : "sum-bad");
+        info.textContent = "機率總和：100.00 / 100.00%";
+        info.className = "flash sum-ok";
+
+        document.getElementById("thanksId").value = thanksItem ? thanksItem.id : "";
+        document.getElementById("thanksName").value = thanksItem ? thanksItem.name : "銘謝惠顧";
+        document.getElementById("thanksProb").textContent =
+            thanksItem ? (thanksItem.probability / 100).toFixed(2) + "%" : "—";
     }
 
     async function savePrize(prizeId, tr) {
@@ -283,6 +300,22 @@
             await selectActivity(selectedId);
         } catch (e) {
             alert("刪除失敗：" + e.message);
+        }
+    }
+
+    async function saveThanksName() {
+        const id = document.getElementById("thanksId").value;
+        if (!id) return;
+        try {
+            await api("/api/admin/prizes/" + id, { method: "PUT", body: JSON.stringify({
+                name: document.getElementById("thanksName").value,
+                probability: 0,
+                totalStock: 0,
+                remainingStock: 0
+            }) });
+            await selectActivity(selectedId);
+        } catch (e) {
+            alert("儲存失敗：" + e.message);
         }
     }
 
