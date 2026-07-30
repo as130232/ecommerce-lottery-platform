@@ -9,8 +9,10 @@
         body { font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif;
                margin: 0; background: #f4f5f7; color: #222; }
         header { background: #333; color: #fff; padding: 14px 20px; font-weight: 600;
-                 display: flex; justify-content: space-between; }
-        header a { color: #ffd; font-size: 13px; }
+                 display: flex; justify-content: space-between; align-items: center; }
+        .header-link { color: #ffd; font-size: 13px; font-weight: normal; border: 1px solid rgba(255,255,200,.4);
+                       border-radius: 5px; padding: 4px 10px; text-decoration: none; }
+        .header-link:hover { background: rgba(255,255,255,.1); }
         .wrap { max-width: 900px; margin: 0 auto; padding: 20px; }
         .card { background: #fff; border-radius: 10px; padding: 18px; margin-bottom: 18px;
                 box-shadow: 0 1px 4px rgba(0,0,0,.08); }
@@ -35,8 +37,14 @@
 </head>
 <body>
 <header>
-    <span>🛠️ 抽獎後台設定（ADMIN）</span>
-    <a href="/">← 回轉盤前台</a>
+    <div style="display:flex; align-items:center; gap:12px">
+        <span>🛠️ 抽獎後台設定（ADMIN）</span>
+        <a href="/" class="header-link">← 回轉盤前台</a>
+    </div>
+    <div id="userInfo" style="display:none; align-items:center; gap:8px">
+        <span id="usernameDisplay" style="font-size:13px; font-weight:normal; color:#ffd"></span>
+        <button onclick="logout()">登出</button>
+    </div>
 </header>
 <div class="wrap">
     <div class="card" id="loginCard">
@@ -125,8 +133,10 @@
                 body: JSON.stringify({ username: document.getElementById("username").value,
                                        password: document.getElementById("password").value }) });
             token = data.accessToken;
+            document.getElementById("loginCard").style.display = "none";
+            document.getElementById("usernameDisplay").textContent = document.getElementById("username").value;
+            document.getElementById("userInfo").style.display = "flex";
             document.getElementById("console").style.display = "block";
-            document.getElementById("loginMsg").textContent = "登入成功";
             await loadActivities();
         } catch (e) {
             flash("loginMsg", "登入失敗：" + e.message, false);
@@ -244,6 +254,15 @@
         } catch (e) {
             flash("addPrizeMsg", e.message, false);
         }
+    }
+
+    function logout() {
+        token = null;
+        selectedId = null;
+        document.getElementById("loginCard").style.display = "block";
+        document.getElementById("console").style.display = "none";
+        document.getElementById("userInfo").style.display = "none";
+        document.getElementById("usernameDisplay").textContent = "";
     }
 
     async function loadStats(id) {

@@ -8,7 +8,11 @@
         * { box-sizing: border-box; }
         body { font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif;
                margin: 0; background: #f4f5f7; color: #222; }
-        header { background: #c8102e; color: #fff; padding: 14px 20px; font-weight: 600; }
+        header { background: #c8102e; color: #fff; padding: 14px 20px; font-weight: 600;
+                 display: flex; justify-content: space-between; align-items: center; }
+        .header-link { color: #fff; font-size: 13px; font-weight: normal; border: 1px solid rgba(255,255,255,.6);
+                       border-radius: 5px; padding: 4px 10px; text-decoration: none; }
+        .header-link:hover { background: rgba(255,255,255,.15); }
         .wrap { max-width: 760px; margin: 0 auto; padding: 20px; }
         .card { background: #fff; border-radius: 10px; padding: 18px; margin-bottom: 18px;
                 box-shadow: 0 1px 4px rgba(0,0,0,.08); }
@@ -31,7 +35,16 @@
     </style>
 </head>
 <body>
-<header>🎡 電商轉盤抽獎 Demo</header>
+<header>
+    <div style="display:flex; align-items:center; gap:12px">
+        <span>🎡 電商轉盤抽獎 Demo</span>
+        <a href="/admin.html" class="header-link">後台設定 →</a>
+    </div>
+    <div id="userInfo" style="display:none; align-items:center; gap:8px">
+        <span id="usernameDisplay" style="font-size:13px; font-weight:normal"></span>
+        <button class="ghost" onclick="logout()">登出</button>
+    </div>
+</header>
 <div class="wrap">
     <div class="card" id="loginCard">
         <div class="row">
@@ -89,7 +102,9 @@
             const data = await api("/api/auth/login", { method: "POST",
                 body: JSON.stringify({ username, password }) });
             token = data.accessToken;
-            document.getElementById("loginMsg").textContent = "登入成功";
+            document.getElementById("loginCard").style.display = "none";
+            document.getElementById("usernameDisplay").textContent = username;
+            document.getElementById("userInfo").style.display = "flex";
             document.getElementById("gameCard").style.display = "block";
             document.getElementById("recordCard").style.display = "block";
             await loadActivity();
@@ -213,6 +228,16 @@
     function setButtons(disabled) {
         document.getElementById("spin1").disabled = disabled;
         document.getElementById("spin5").disabled = disabled;
+    }
+
+    function logout() {
+        token = null;
+        document.getElementById("loginCard").style.display = "block";
+        document.getElementById("gameCard").style.display = "none";
+        document.getElementById("recordCard").style.display = "none";
+        document.getElementById("userInfo").style.display = "none";
+        document.getElementById("usernameDisplay").textContent = "";
+        document.getElementById("loginMsg").textContent = "";
     }
 </script>
 </body>
