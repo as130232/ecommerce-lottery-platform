@@ -12,6 +12,7 @@ import com.amway.ecommerce.lottery.prize.domain.Prize;
 import com.amway.ecommerce.lottery.prize.domain.PrizeRepository;
 import com.amway.ecommerce.lottery.prize.domain.PrizeType;
 import com.amway.ecommerce.lottery.riskcontrol.RiskControlPort;
+import com.amway.ecommerce.lottery.support.AbstractIntegrationTest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -22,38 +23,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.MySQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 /**
  * Proves the two hard invariants under real concurrency against real MySQL + Redis:
  * never over-draw stock, and never let a user exceed their per-activity limit.
  */
 @SpringBootTest
-@Testcontainers
-class ConcurrentDrawTest {
-
-    @Container
-    static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
-            .withDatabaseName("lottery");
-
-    @Container
-    static final GenericContainer<?> REDIS = new GenericContainer<>(DockerImageName.parse("redis:7-alpine"))
-            .withExposedPorts(6379);
-
-    @DynamicPropertySource
-    static void props(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
-        registry.add("spring.datasource.username", MYSQL::getUsername);
-        registry.add("spring.datasource.password", MYSQL::getPassword);
-        registry.add("spring.data.redis.host", REDIS::getHost);
-        registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
-    }
+class ConcurrentDrawTest extends AbstractIntegrationTest {
 
     @Autowired
     private DrawService drawService;
