@@ -43,4 +43,4 @@ Pure unit tests (probability distribution, boundaries, error cases) run without 
 
 ## API overview
 
-Auth: `POST /api/auth/{register,login}`. User: `GET /api/activities`, `POST /api/activities/{id}/draws`, `GET /api/activities/{id}/{my-records,my-quota}`. Admin (ADMIN role): `GET/POST/PUT /api/admin/activities...`, `PUT /api/admin/prizes/{id}`, `GET /api/admin/activities/{id}/stats`. Every response is wrapped as `{ success, code, message, data }`. Full parameters in Swagger.
+Auth: `POST /api/auth/{register,login}` (login returns token + role). User: `GET /api/activities`, `GET /api/activities/{id}`, `POST /api/activities/{id}/draws` (times 1–10), `GET /api/activities/{id}/{my-records,my-quota}`. Admin (ADMIN role): `GET /api/admin/activities`, `POST /api/admin/activities`, `PUT /api/admin/activities/{id}`, `POST /api/admin/activities/{id}/prizes`, `PUT /api/admin/prizes/{id}`, `DELETE /api/admin/prizes/{id}`, `GET /api/admin/activities/{id}/stats`. Every response is wrapped as `{ success, code, message, data }`. Full parameters in Swagger at `/swagger-ui.html`.

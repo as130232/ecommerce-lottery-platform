@@ -95,15 +95,18 @@ docker run -d --name redis -p 6379:6379 redis:7-alpine
 | Method | Path | 權限 | 說明 |
 |---|---|---|---|
 | POST | `/api/auth/register` | 公開 | 註冊一般使用者 |
-| POST | `/api/auth/login` | 公開 | 登入取得 JWT |
+| POST | `/api/auth/login` | 公開 | 登入取得 JWT（回傳 token + role） |
 | GET | `/api/activities` | 登入 | 進行中的活動 |
 | GET | `/api/activities/{id}` | 登入 | 活動明細 + 獎品 |
-| POST | `/api/activities/{id}/draws` | USER | 單抽 / 連抽 |
+| POST | `/api/activities/{id}/draws` | USER | 單抽 / 連抽（times 1–10） |
 | GET | `/api/activities/{id}/my-records` | USER | 我的抽獎紀錄 |
+| GET | `/api/activities/{id}/my-quota` | USER | 剩餘可抽次數 |
+| GET | `/api/admin/activities` | ADMIN | 列出所有活動（含 DRAFT） |
 | POST | `/api/admin/activities` | ADMIN | 建立活動 |
 | PUT | `/api/admin/activities/{id}` | ADMIN | 更新活動（活化時驗證機率總和） |
 | POST | `/api/admin/activities/{id}/prizes` | ADMIN | 新增獎品 |
-| PUT | `/api/admin/prizes/{id}` | ADMIN | 改機率 / 庫存（即時生效） |
+| PUT | `/api/admin/prizes/{id}` | ADMIN | 改名稱 / 機率 / 庫存（即時生效） |
+| DELETE | `/api/admin/prizes/{id}` | ADMIN | 刪除獎品（無抽獎紀錄才可刪） |
 | GET | `/api/admin/activities/{id}/stats` | ADMIN | 抽獎統計 |
 
 所有回應統一包在 `{ success, code, message, data }`。詳細參數見 Swagger。

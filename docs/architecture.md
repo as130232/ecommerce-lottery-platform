@@ -50,6 +50,6 @@
 
 ## 可觀測性與部署
 
-- Actuator 暴露 `health`（liveness/readiness probes）、`metrics`、`prometheus`。
+- Actuator 暴露 `health`（liveness/readiness probes）與 `info`（公開）、`metrics`（需登入）。
 - 無狀態 → K8s 多副本水平擴展（見 `deploy/k8s/deployment.yaml`）。
 - 全部組態走環境變數 → 同一映像檔跑遍 dev / staging / prod。
