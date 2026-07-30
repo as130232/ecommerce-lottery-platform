@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>轉盤抽獎 Demo</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif;
+               margin: 0; background: #f4f5f7; color: #222; }
+        header { background: #c8102e; color: #fff; padding: 14px 20px; font-weight: 600; }
+        .wrap { max-width: 760px; margin: 0 auto; padding: 20px; }
+        .card { background: #fff; border-radius: 10px; padding: 18px; margin-bottom: 18px;
+                box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+        label { font-size: 13px; color: #555; }
+        input { padding: 8px; border: 1px solid #ccc; border-radius: 6px; margin-right: 8px; }
+        button { background: #c8102e; color: #fff; border: none; border-radius: 6px;
+                 padding: 9px 16px; cursor: pointer; font-size: 14px; }
+        button:disabled { background: #bbb; cursor: not-allowed; }
+        button.ghost { background: #fff; color: #c8102e; border: 1px solid #c8102e; }
+        .wheel-box { position: relative; width: 320px; height: 320px; margin: 10px auto; }
+        .pointer { position: absolute; top: -6px; left: 50%; transform: translateX(-50%);
+                   width: 0; height: 0; border-left: 12px solid transparent;
+                   border-right: 12px solid transparent; border-top: 22px solid #333; z-index: 2; }
+        canvas { border-radius: 50%; box-shadow: 0 2px 10px rgba(0,0,0,.15);
+                 transition: transform 4s cubic-bezier(.15,.85,.25,1); }
+        .result { text-align: center; font-size: 18px; margin-top: 10px; min-height: 26px; font-weight: 600; }
+        .muted { color: #888; font-size: 13px; }
+        ul { padding-left: 18px; } li { margin: 3px 0; font-size: 14px; }
+        .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    </style>
+</head>
+<body>
+<header>🎡 電商轉盤抽獎 Demo</header>
+<div class="wrap">
+    <div class="card" id="loginCard">
+        <div class="row">
+            <label>帳號</label><input id="username" value="alice"/>
+            <label>密碼</label><input id="password" type="password" value="alice123"/>
+            <button onclick="login()">登入</button>
+            <span class="muted" id="loginMsg"></span>
+        </div>
+        <p class="muted">預設帳號：alice / alice123（一般使用者），admin / admin123（管理員）</p>
+    </div>
+
+    <div class="card" id="gameCard" style="display:none">
+        <h3 id="activityName">活動載入中…</h3>
+        <div class="wheel-box">
+            <div class="pointer"></div>
+            <canvas id="wheel" width="320" height="320"></canvas>
+        </div>
+        <div class="row" style="justify-content:center">
+            <button id="spin1" onclick="draw(1)">抽一次</button>
+            <button id="spin5" class="ghost" onclick="draw(5)">連抽 5 次</button>
+        </div>
+        <div class="result" id="result"></div>
+    </div>
+
+    <div class="card" id="recordCard" style="display:none">
+        <div class="row" style="justify-content:space-between">
+            <h3 style="margin:0">我的抽獎紀錄</h3>
+            <button class="ghost" onclick="loadRecords()">重新整理</button>
+        </div>
+        <ul id="records"></ul>
+    </div>
+</div>
+
+<script>
+    const ACTIVITY_ID = 1;
+    let token = null;
+    let prizes = [];
+    let currentAngle = 0;
+    const colors = ["#c8102e", "#f4a300", "#2e86de", "#27ae60", "#8e44ad", "#16a085", "#d35400"];
+
+    async function api(path, options = {}) {
+        options.headers = Object.assign({ "Content-Type": "application/json" }, options.headers || {});
+        if (token) options.headers["Authorization"] = "Bearer " + token;
+        const res = await fetch(path, options);
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.message || ("HTTP " + res.status));
+        return body.data;
+    }
+
+    async function login() {
+        const username = document.getElementById("username").value;
+        const password = document.getElementById("password").value;
+        try {
+            const data = await api("/api/auth/login", { method: "POST",
+                body: JSON.stringify({ username, password }) });
+            token = data.accessToken;
+            document.getElementById("loginMsg").textContent = "登入成功";
+            document.getElementById("gameCard").style.display = "block";
+            document.getElementById("recordCard").style.display = "block";
+            await loadActivity();
+            await loadRecords();
+        } catch (e) {
+            document.getElementById("loginMsg").textContent = "登入失敗：" + e.message;
+        }
+    }
+
+    async function loadActivity() {
+        const detail = await api("/api/activities/" + ACTIVITY_ID);
+        document.getElementById("activityName").textContent = detail.name;
+        prizes = detail.prizes;
+        drawWheel();
+    }
+
+    function drawWheel() {
+        const canvas = document.getElementById("wheel");
+        const ctx = canvas.getContext("2d");
+        const cx = 160, cy = 160, r = 155;
+        const slice = (2 * Math.PI) / prizes.length;
+        ctx.clearRect(0, 0, 320, 320);
+        prizes.forEach((p, i) => {
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.arc(cx, cy, r, i * slice, (i + 1) * slice);
+            ctx.fillStyle = colors[i % colors.length];
+            ctx.fill();
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(i * slice + slice / 2);
+            ctx.fillStyle = "#fff";
+            ctx.font = "13px sans-serif";
+            ctx.textAlign = "right";
+            ctx.fillText(p.name.substring(0, 8), r - 12, 5);
+            ctx.restore();
+        });
+    }
+
+    function segmentIndexOf(prizeId) {
+        const idx = prizes.findIndex(p => p.id === prizeId);
+        return idx < 0 ? 0 : idx;
+    }
+
+    async function draw(times) {
+        setButtons(true);
+        document.getElementById("result").textContent = "抽獎中…";
+        try {
+            // idempotencyKey left blank -> backend generates one per request
+            const result = await api("/api/activities/" + ACTIVITY_ID + "/draws",
+                { method: "POST", body: JSON.stringify({ times }) });
+            // spin the wheel to the first outcome for a bit of flair
+            const first = result.outcomes[0];
+            spinTo(segmentIndexOf(first.prizeId), () => showResult(result.outcomes));
+        } catch (e) {
+            document.getElementById("result").textContent = "失敗：" + e.message;
+            setButtons(false);
+        }
+    }
+
+    function spinTo(index, done) {
+        const slice = 360 / prizes.length;
+        // land the pointer (top) at the middle of the target slice, plus some full spins
+        const target = 360 * 5 + (360 - (index * slice + slice / 2));
+        currentAngle = target;
+        const canvas = document.getElementById("wheel");
+        canvas.style.transform = "rotate(" + currentAngle + "deg)";
+        setTimeout(() => {
+            // normalise so repeated spins don't accumulate huge numbers
+            currentAngle = currentAngle % 360;
+            canvas.style.transition = "none";
+            canvas.style.transform = "rotate(" + currentAngle + "deg)";
+            void canvas.offsetWidth; // reflow
+            canvas.style.transition = "";
+            done();
+            setButtons(false);
+            loadRecords();
+        }, 4100);
+    }
+
+    function showResult(outcomes) {
+        const wins = outcomes.filter(o => o.result === "WIN");
+        if (outcomes.length === 1) {
+            const o = outcomes[0];
+            document.getElementById("result").textContent =
+                o.result === "WIN" ? ("🎉 恭喜中獎：" + o.prizeName) : "銘謝惠顧，再接再厲！";
+        } else {
+            document.getElementById("result").textContent =
+                "連抽 " + outcomes.length + " 次，中獎 " + wins.length + " 個" +
+                (wins.length ? "：" + wins.map(w => w.prizeName).join("、") : "");
+        }
+    }
+
+    async function loadRecords() {
+        try {
+            const records = await api("/api/activities/" + ACTIVITY_ID + "/my-records");
+            const ul = document.getElementById("records");
+            ul.innerHTML = "";
+            records.slice(0, 15).forEach(r => {
+                const li = document.createElement("li");
+                const tag = r.result === "WIN" ? "🎁 " + r.prizeName : "銘謝惠顧";
+                li.textContent = r.createdAt.replace("T", " ") + "  ·  " + tag;
+                ul.appendChild(li);
+            });
+        } catch (e) { /* ignore on the records panel */ }
+    }
+
+    function setButtons(disabled) {
+        document.getElementById("spin1").disabled = disabled;
+        document.getElementById("spin5").disabled = disabled;
+    }
+</script>
+</body>
+</html>

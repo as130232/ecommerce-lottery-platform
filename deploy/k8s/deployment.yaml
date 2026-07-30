@@ -1,0 +1,59 @@
+# Sample K8s manifest showing horizontal scaling readiness.
+# The app is stateless (JWT auth, no server-side session), so replicas scale
+# freely; MySQL and Redis are the shared state. Secrets/config come from env,
+# matching application.yml, so no image rebuild is needed per environment.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lottery-platform
+  labels:
+    app: lottery-platform
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: lottery-platform
+  template:
+    metadata:
+      labels:
+        app: lottery-platform
+    spec:
+      containers:
+        - name: lottery-platform
+          image: your-registry/lottery-platform:0.0.1
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DB_URL
+              valueFrom: { secretKeyRef: { name: lottery-secrets, key: db-url } }
+            - name: DB_USERNAME
+              valueFrom: { secretKeyRef: { name: lottery-secrets, key: db-username } }
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: lottery-secrets, key: db-password } }
+            - name: REDIS_HOST
+              value: lottery-redis
+            - name: JWT_SECRET
+              valueFrom: { secretKeyRef: { name: lottery-secrets, key: jwt-secret } }
+          resources:
+            requests: { cpu: "250m", memory: "512Mi" }
+            limits: { cpu: "1", memory: "1Gi" }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8080 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8080 }
+            initialDelaySeconds: 30
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lottery-platform
+spec:
+  selector:
+    app: lottery-platform
+  ports:
+    - port: 80
+      targetPort: 8080
+  type: ClusterIP

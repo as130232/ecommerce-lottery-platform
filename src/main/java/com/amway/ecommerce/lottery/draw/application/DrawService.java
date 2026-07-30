@@ -125,6 +125,7 @@ public class DrawService {
 
             drawRecordRepository.save(new DrawRecord(activityId, userId, awarded.getId(),
                     result, requestKey + "#" + i));
+            // TODO: 中獎後改發 MQ 事件（出貨 / 通知），把副作用從抽獎主流程解耦
             outcomes.add(new DrawOutcome(awarded.getId(), awarded.getName(), result));
         }
         return new DrawBatchResult(times, outcomes);
