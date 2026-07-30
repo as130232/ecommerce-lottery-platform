@@ -1,0 +1,61 @@
+# Horizontal-scaling demo: two stateless app instances behind nginx, sharing one
+# MySQL + one Redis. Proves the concurrency guarantees hold across *processes*,
+# not just threads in one JVM.
+#
+#   docker compose -f deploy/scaling/docker-compose.scale.yml up --build
+#   # then hammer http://localhost:8080 - stock never goes negative.
+name: lottery-scale
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: lottery
+      MYSQL_USER: lottery
+      MYSQL_PASSWORD: lottery
+      MYSQL_ROOT_PASSWORD: root
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app1:
+    build:
+      context: ../..
+    image: lottery-platform:local
+    environment: &app-env
+      SERVER_PORT: "8080"
+      DB_URL: jdbc:mysql://mysql:3306/lottery?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      DB_USERNAME: lottery
+      DB_PASSWORD: lottery
+      REDIS_HOST: redis
+      JWT_SECRET: scale-demo-secret-long-enough-32bytes-abcdefgh
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  app2:
+    image: lottery-platform:local
+    environment: *app-env
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      app1: { condition: service_started }
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "${LB_PORT:-8080}:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app1
+      - app2
