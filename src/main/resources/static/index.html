@@ -86,10 +86,11 @@
 
         /* ---- Page-specific: lottery wheel ---- */
         .wheel-box { position: relative; width: 320px; height: 320px; margin: 14px auto; }
-        .pointer { position: absolute; top: -6px; left: 50%; transform: translateX(-50%);
-                   width: 0; height: 0; border-left: 12px solid transparent;
-                   border-right: 12px solid transparent; border-top: 22px solid var(--text); z-index: 2; }
-        canvas { border-radius: 50%; box-shadow: 0 4px 18px rgba(15,23,42,.16);
+        .pointer { position: absolute; top: -4px; left: 50%; transform: translateX(-50%);
+                   width: 0; height: 0; border-left: 13px solid transparent;
+                   border-right: 13px solid transparent; border-top: 26px solid var(--accent); z-index: 3;
+                   filter: drop-shadow(0 2px 3px rgba(15,23,42,.35)); }
+        canvas { border-radius: 50%; box-shadow: 0 6px 22px rgba(15,23,42,.20);
                  transition: transform 4s cubic-bezier(.15,.85,.25,1); }
         .result { text-align: center; font-size: 18px; margin-top: 12px; min-height: 26px; font-weight: 600; }
         ul { padding-left: 18px; } li { margin: 4px 0; font-size: 14px; }
@@ -149,7 +150,8 @@
     let token = null;
     let prizes = [];
     let currentAngle = 0;
-    const colors = ["#c8102e", "#f4a300", "#2e86de", "#27ae60", "#8e44ad", "#16a085", "#d35400"];
+    // refined, tonally-harmonised jewel palette (similar saturation/lightness)
+    const colors = ["#e14b5a", "#eaa23b", "#2fa4a0", "#5b6ee0", "#a45bd0", "#3bb273", "#e2734a"];
 
     async function api(path, options = {}) {
         options.headers = Object.assign({ "Content-Type": "application/json" }, options.headers || {});
@@ -235,27 +237,121 @@
         drawWheel();
     }
 
+    // blend a hex colour toward white (pct>0) or black (pct<0), pct in [-1,1]
+    function shade(hex, pct) {
+        const num = parseInt(hex.slice(1), 16);
+        const t = pct < 0 ? 0 : 255, p = Math.abs(pct);
+        const r = Math.round(((num >> 16) & 255) * (1 - p) + t * p);
+        const g = Math.round(((num >> 8) & 255) * (1 - p) + t * p);
+        const b = Math.round((num & 255) * (1 - p) + t * p);
+        return `rgb(${r},${g},${b})`;
+    }
+
     function drawWheel() {
         const canvas = document.getElementById("wheel");
+        const size = 320, dpr = window.devicePixelRatio || 1;
+        // render at device resolution for crisp edges & text, keep 320px CSS box
+        canvas.width = size * dpr;
+        canvas.height = size * dpr;
+        canvas.style.width = size + "px";
+        canvas.style.height = size + "px";
         const ctx = canvas.getContext("2d");
-        const cx = 160, cy = 160, r = 155;
-        const slice = (2 * Math.PI) / prizes.length;
-        ctx.clearRect(0, 0, 320, 320);
+        ctx.scale(dpr, dpr);
+
+        const cx = 160, cy = 160;
+        const rimInner = 140, rimOuter = 158, hubR = 34;
+        const n = prizes.length || 1;
+        const slice = (2 * Math.PI) / n;   // slices start at 0 (3 o'clock); spinTo math depends on this
+        ctx.clearRect(0, 0, size, size);
+
+        // 1) wedges with a centre→edge radial gradient for depth
         prizes.forEach((p, i) => {
+            const base = colors[i % colors.length];
+            const g = ctx.createRadialGradient(cx, cy, hubR, cx, cy, rimInner);
+            g.addColorStop(0, shade(base, 0.10));
+            g.addColorStop(1, shade(base, -0.16));
             ctx.beginPath();
             ctx.moveTo(cx, cy);
-            ctx.arc(cx, cy, r, i * slice, (i + 1) * slice);
-            ctx.fillStyle = colors[i % colors.length];
+            ctx.arc(cx, cy, rimInner, i * slice, (i + 1) * slice);
+            ctx.closePath();
+            ctx.fillStyle = g;
             ctx.fill();
+        });
+
+        // 2) thin separators between wedges
+        ctx.strokeStyle = "rgba(255,255,255,.30)";
+        ctx.lineWidth = 1.5;
+        for (let i = 0; i < n; i++) {
+            const a = i * slice;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + rimInner * Math.cos(a), cy + rimInner * Math.sin(a));
+            ctx.stroke();
+        }
+
+        // 3) prize labels (with a soft shadow for legibility)
+        prizes.forEach((p, i) => {
             ctx.save();
             ctx.translate(cx, cy);
             ctx.rotate(i * slice + slice / 2);
-            ctx.fillStyle = "#fff";
-            ctx.font = "13px sans-serif";
             ctx.textAlign = "right";
-            ctx.fillText(p.name.substring(0, 8), r - 12, 5);
+            ctx.font = "600 13px -apple-system, 'PingFang TC', sans-serif";
+            ctx.shadowColor = "rgba(0,0,0,.35)";
+            ctx.shadowBlur = 3;
+            ctx.shadowOffsetY = 1;
+            ctx.fillStyle = "#fff";
+            ctx.fillText(p.name.substring(0, 8), rimInner - 14, 5);
             ctx.restore();
         });
+
+        // 4) deep slate outer rim band (subtle metallic sheen)
+        const rimGrad = ctx.createLinearGradient(0, cy - rimOuter, 0, cy + rimOuter);
+        rimGrad.addColorStop(0, "#3a506b");
+        rimGrad.addColorStop(0.5, "#24354a");
+        rimGrad.addColorStop(1, "#16202e");
+        ctx.beginPath();
+        ctx.arc(cx, cy, (rimInner + rimOuter) / 2, 0, 2 * Math.PI);
+        ctx.lineWidth = rimOuter - rimInner;
+        ctx.strokeStyle = rimGrad;
+        ctx.stroke();
+        // crisp hairline on the very edge
+        ctx.beginPath();
+        ctx.arc(cx, cy, rimOuter, 0, 2 * Math.PI);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = "rgba(15,23,42,.15)";
+        ctx.stroke();
+
+        // 5) evenly-spaced light dots on the rim
+        const dotR = (rimInner + rimOuter) / 2;
+        for (let i = 0; i < n; i++) {
+            const a = i * slice;
+            ctx.beginPath();
+            ctx.arc(cx + dotR * Math.cos(a), cy + dotR * Math.sin(a), 2.5, 0, 2 * Math.PI);
+            ctx.fillStyle = "rgba(255,255,255,.85)";
+            ctx.fill();
+        }
+
+        // 6) centre hub: white disc + crimson ring + centre dot
+        ctx.shadowColor = "rgba(15,23,42,.28)";
+        ctx.shadowBlur = 10;
+        ctx.shadowOffsetY = 2;
+        const hubGrad = ctx.createRadialGradient(cx - 9, cy - 9, 4, cx, cy, hubR);
+        hubGrad.addColorStop(0, "#ffffff");
+        hubGrad.addColorStop(1, "#e9edf3");
+        ctx.beginPath();
+        ctx.arc(cx, cy, hubR, 0, 2 * Math.PI);
+        ctx.fillStyle = hubGrad;
+        ctx.fill();
+        ctx.shadowColor = "transparent";
+        ctx.beginPath();
+        ctx.arc(cx, cy, hubR - 1, 0, 2 * Math.PI);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "#d81f2c";
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(cx, cy, 9, 0, 2 * Math.PI);
+        ctx.fillStyle = "#d81f2c";
+        ctx.fill();
     }
 
     function segmentIndexOf(prizeId) {
