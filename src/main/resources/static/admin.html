@@ -5,54 +5,121 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>抽獎後台設定</title>
     <style>
+        /* ---- Design tokens (shared with index.html; only --accent/--header-* differ) ---- */
+        :root {
+            --accent: #4f6cff;
+            --accent-hover: #3a54d6;
+            --header-bg: linear-gradient(180deg, #24354a 0%, #1a2836 100%);
+            --bg: #eef1f5;
+            --surface: #ffffff;
+            --border: rgba(15,23,42,.08);
+            --border-strong: rgba(15,23,42,.14);
+            --radius: 14px;
+            --radius-sm: 9px;
+            --shadow: 0 1px 2px rgba(15,23,42,.04), 0 6px 16px rgba(15,23,42,.05);
+            --shadow-hover: 0 2px 4px rgba(15,23,42,.06), 0 10px 24px rgba(15,23,42,.09);
+            --text: #0f172a;
+            --muted: #64748b;
+            --ring: color-mix(in srgb, var(--accent) 30%, transparent);
+        }
         * { box-sizing: border-box; }
-        body { font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif;
-               margin: 0; background: #f4f5f7; color: #222; }
-        header { background: #333; color: #fff; padding: 14px 20px; font-weight: 600;
-                 display: flex; justify-content: space-between; align-items: center; }
-        .header-link { color: #ffd; font-size: 13px; font-weight: normal; border: 1px solid rgba(255,255,200,.4);
-                       border-radius: 5px; padding: 4px 10px; text-decoration: none; }
-        .header-link:hover { background: rgba(255,255,255,.1); }
-        .wrap { max-width: 900px; margin: 0 auto; padding: 20px; }
-        .card { background: #fff; border-radius: 10px; padding: 18px; margin-bottom: 18px;
-                box-shadow: 0 1px 4px rgba(0,0,0,.08); }
-        h3 { margin: 0 0 12px; }
-        label { font-size: 13px; color: #555; margin-right: 4px; }
-        input, select { padding: 7px; border: 1px solid #ccc; border-radius: 6px; margin: 3px 8px 3px 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Microsoft JhengHei", sans-serif;
+               margin: 0; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
+
+        /* ---- Header (shared component) ---- */
+        header { background: var(--header-bg); color: #fff; padding: 16px 24px;
+                 display: flex; justify-content: space-between; align-items: center;
+                 box-shadow: 0 1px 3px rgba(15,23,42,.12); }
+        header .brand { display: flex; align-items: center; gap: 14px;
+                        font-weight: 600; font-size: 17px; letter-spacing: -0.01em; }
+        .header-link { color: #fff; font-size: 13px; font-weight: 500; text-decoration: none;
+                       border: 1px solid rgba(255,255,255,.28); border-radius: 999px;
+                       padding: 5px 12px; transition: background 150ms ease; }
+        .header-link:hover { background: rgba(255,255,255,.14); }
+        .user-chip { display: none; align-items: center; gap: 10px;
+                     background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.18);
+                     border-radius: 999px; padding: 4px 5px 4px 14px; }
+        .user-chip .uname { font-size: 13px; font-weight: 500; color: #fff; }
+        .user-chip button { border-radius: 999px; padding: 6px 15px; font-size: 13px; box-shadow: none; }
+        .user-chip button:hover:not(:disabled) { transform: none; box-shadow: 0 1px 4px rgba(15,23,42,.2); }
+
+        /* ---- Layout & cards (shared component) ---- */
+        .wrap { max-width: 900px; margin: 0 auto; padding: 24px 20px; }
+        .card { background: var(--surface); border: 1px solid var(--border);
+                border-radius: var(--radius); padding: 22px; margin-bottom: 20px;
+                box-shadow: var(--shadow); }
+        h3 { margin: 0 0 14px; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+        label { font-size: 13px; color: var(--muted); margin-right: 4px; }
+
+        /* ---- Form controls (shared component) ---- */
+        input, select { padding: 9px 11px; border: 1px solid var(--border-strong);
+                         border-radius: var(--radius-sm); font-size: 14px; color: var(--text);
+                         background: #fff; margin: 4px 10px 4px 0;
+                         transition: border-color 150ms ease, box-shadow 150ms ease; }
+        input:focus, select:focus { outline: none; border-color: var(--accent);
+                                     box-shadow: 0 0 0 3px var(--ring); }
         input.sm { width: 90px; }
-        button { background: #c8102e; color: #fff; border: none; border-radius: 6px;
-                 padding: 8px 14px; cursor: pointer; font-size: 13px; }
-        button.ghost { background: #fff; color: #333; border: 1px solid #999; }
-        button.mini { padding: 5px 10px; font-size: 12px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-        th, td { border-bottom: 1px solid #eee; padding: 6px 4px; text-align: left; font-size: 13px; }
-        .muted { color: #888; font-size: 13px; }
-        .rowline { padding: 8px; border: 1px solid #eee; border-radius: 6px; margin: 6px 0; cursor: pointer; }
-        .rowline:hover { background: #fafafa; }
-        .rowline.active { border-color: #c8102e; background: #fff7f8; }
-        .sum-ok { color: #27ae60; font-weight: 600; }
-        .sum-bad { color: #c8102e; font-weight: 600; }
+
+        /* ---- Buttons (shared component) ---- */
+        button { background: var(--accent); color: #fff; border: none; border-radius: var(--radius-sm);
+                 padding: 9px 16px; cursor: pointer; font-size: 13px; font-weight: 500;
+                 transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease; }
+        button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--shadow-hover);
+                                       background: var(--accent-hover); }
+        button:active:not(:disabled) { transform: translateY(0); box-shadow: none; }
+        button:disabled { background: #cbd5e1; cursor: not-allowed; }
+        button.ghost { background: #fff; color: var(--accent); border: 1px solid var(--accent); }
+        button.ghost:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 8%, #fff);
+                                            color: var(--accent); }
+        button.mini { padding: 6px 11px; font-size: 12px; }
+
+        /* ---- Login form (shared component, identical on both pages) ---- */
+        .login-card { max-width: 380px; }
+        .login-form { display: flex; flex-direction: column; gap: 14px; }
+        .field { display: flex; flex-direction: column; gap: 6px; }
+        .field label { margin-right: 0; }
+        .field input { width: 100%; margin: 0; }
+        .login-form button { width: 100%; margin-top: 2px; }
+        .login-form .muted, .login-form .flash { text-align: center; margin-left: 0; }
+
+        /* ---- Table & list (page-specific) ---- */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase;
+             letter-spacing: .02em; }
+        th, td { border-bottom: 1px solid var(--border); padding: 9px 6px; text-align: left; font-size: 13px; }
+        .rowline { padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+                   margin: 8px 0; cursor: pointer; transition: background 150ms ease, border-color 150ms ease; }
+        .rowline:hover { background: #f8fafc; }
+        .rowline.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, #fff); }
+
+        /* ---- Utilities & status (shared) ---- */
+        .muted { color: var(--muted); font-size: 13px; }
+        .tnum { font-variant-numeric: tabular-nums; }
+        .sum-ok { color: #16a34a; font-weight: 600; }
+        .sum-bad { color: #dc2626; font-weight: 600; }
         .flash { font-size: 13px; margin-left: 8px; }
     </style>
 </head>
 <body>
 <header>
-    <div style="display:flex; align-items:center; gap:12px">
+    <div class="brand">
         <span>🛠️ 抽獎後台設定（ADMIN）</span>
         <a href="/" class="header-link">← 回轉盤前台</a>
     </div>
-    <div id="userInfo" style="display:none; align-items:center; gap:8px">
-        <span id="usernameDisplay" style="font-size:13px; font-weight:normal; color:#ffd"></span>
-        <button onclick="logout()">登出</button>
+    <div id="userInfo" class="user-chip">
+        <span id="usernameDisplay" class="uname"></span>
+        <button class="ghost" onclick="logout()">登出</button>
     </div>
 </header>
 <div class="wrap">
-    <div class="card" id="loginCard">
+    <div class="card login-card" id="loginCard">
         <h3>管理員登入</h3>
-        <label>帳號</label><input id="username" value="admin"/>
-        <label>密碼</label><input id="password" type="password" value="admin123"/>
-        <button onclick="login()">登入</button>
-        <span class="flash muted" id="loginMsg"></span>
+        <div class="login-form">
+            <div class="field"><label>帳號</label><input id="username" value="admin"/></div>
+            <div class="field"><label>密碼</label><input id="password" type="password" value="admin123"/></div>
+            <button onclick="login()">登入</button>
+            <span class="flash muted" id="loginMsg"></span>
+        </div>
     </div>
 
     <div id="console" style="display:none">
@@ -111,7 +178,7 @@
             </div>
 
             <h3 style="margin-top:18px">統計</h3>
-            <div id="statsBox" class="muted"></div>
+            <div id="statsBox" class="muted tnum"></div>
         </div>
     </div>
 </div>
