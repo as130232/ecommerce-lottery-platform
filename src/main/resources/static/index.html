@@ -53,6 +53,7 @@
             <button id="spin1" onclick="draw(1)">抽一次</button>
             <button id="spin5" class="ghost" onclick="draw(5)">連抽 5 次</button>
         </div>
+        <div class="muted" id="quota" style="text-align:center;margin-top:8px"></div>
         <div class="result" id="result"></div>
     </div>
 
@@ -93,9 +94,18 @@
             document.getElementById("recordCard").style.display = "block";
             await loadActivity();
             await loadRecords();
+            await loadQuota();
         } catch (e) {
             document.getElementById("loginMsg").textContent = "登入失敗：" + e.message;
         }
+    }
+
+    async function loadQuota() {
+        try {
+            const q = await api("/api/activities/" + ACTIVITY_ID + "/my-quota");
+            document.getElementById("quota").textContent =
+                "剩餘可抽次數：" + q.remaining + " / " + q.perUserDrawLimit + "（已抽 " + q.used + " 次）";
+        } catch (e) { /* ignore */ }
     }
 
     async function loadActivity() {
@@ -151,8 +161,11 @@
 
     function spinTo(index, done) {
         const slice = 360 / prizes.length;
-        // land the pointer (top) at the middle of the target slice, plus some full spins
-        const target = 360 * 5 + (360 - (index * slice + slice / 2));
+        const center = index * slice + slice / 2;
+        // pointer sits at the top (canvas 270°, since y grows downward); rotate so the
+        // winning slice's centre ends up right under it, after a few full spins.
+        const base = ((270 - center) % 360 + 360) % 360;
+        const target = 360 * 5 + base;
         currentAngle = target;
         const canvas = document.getElementById("wheel");
         canvas.style.transform = "rotate(" + currentAngle + "deg)";
@@ -166,6 +179,7 @@
             done();
             setButtons(false);
             loadRecords();
+            loadQuota();
         }, 4100);
     }
 

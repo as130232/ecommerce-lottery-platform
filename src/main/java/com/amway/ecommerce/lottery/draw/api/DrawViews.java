@@ -20,4 +20,7 @@ public final class DrawViews {
 
     public record DrawRecordView(Long prizeId, String prizeName, DrawResult result, LocalDateTime createdAt) {
     }
+
+    public record QuotaView(int perUserDrawLimit, long used, long remaining) {
+    }
 }

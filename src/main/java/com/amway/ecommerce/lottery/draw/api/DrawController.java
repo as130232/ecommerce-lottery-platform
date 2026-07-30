@@ -4,6 +4,7 @@ import com.amway.ecommerce.lottery.auth.AuthPrincipal;
 import com.amway.ecommerce.lottery.common.api.ApiResponse;
 import com.amway.ecommerce.lottery.draw.api.DrawViews.DrawRecordView;
 import com.amway.ecommerce.lottery.draw.api.DrawViews.DrawRequest;
+import com.amway.ecommerce.lottery.draw.api.DrawViews.QuotaView;
 import com.amway.ecommerce.lottery.draw.application.DrawBatchResult;
 import com.amway.ecommerce.lottery.draw.application.DrawQueryService;
 import com.amway.ecommerce.lottery.draw.application.DrawService;
@@ -53,5 +54,12 @@ public class DrawController {
     public ApiResponse<List<DrawRecordView>> myRecords(@PathVariable Long activityId,
                                                        @AuthenticationPrincipal AuthPrincipal principal) {
         return ApiResponse.ok(drawQueryService.myRecords(activityId, principal.userId()));
+    }
+
+    @GetMapping("/my-quota")
+    @Operation(summary = "查詢自己在此活動的剩餘可抽次數")
+    public ApiResponse<QuotaView> myQuota(@PathVariable Long activityId,
+                                          @AuthenticationPrincipal AuthPrincipal principal) {
+        return ApiResponse.ok(drawQueryService.myQuota(activityId, principal.userId()));
     }
 }
