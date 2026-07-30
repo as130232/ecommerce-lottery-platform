@@ -71,7 +71,7 @@
                                             color: var(--accent); }
 
         /* ---- Login form (shared component, identical on both pages) ---- */
-        .login-card { max-width: 380px; }
+        .login-card { max-width: 380px; margin: 40px auto; }
         .login-form { display: flex; flex-direction: column; gap: 14px; }
         .field { display: flex; flex-direction: column; gap: 6px; }
         .field input { width: 100%; margin: 0; }
@@ -81,6 +81,7 @@
         /* ---- Utilities (shared) ---- */
         .muted { color: var(--muted); font-size: 13px; }
         .tnum { font-variant-numeric: tabular-nums; }
+        .msg-error { color: #dc2626; font-weight: 600; }
         .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
         /* ---- Page-specific: lottery wheel ---- */
@@ -174,7 +175,9 @@
             showConsole(username);
             await loadActivities();
         } catch (e) {
-            document.getElementById("loginMsg").textContent = "登入失敗：" + e.message;
+            const el = document.getElementById("loginMsg");
+            el.textContent = "登入失敗：" + e.message;
+            el.className = "muted msg-error";
         }
     }
 
