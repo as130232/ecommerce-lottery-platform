@@ -5,6 +5,8 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 
 public final class AdminRequests {
 
@@ -12,28 +14,28 @@ public final class AdminRequests {
     }
 
     public record CreateActivityRequest(
-            @NotBlank String code,
-            @NotBlank String name,
+            @NotBlank @Size(max = 64) String code,
+            @NotBlank @Size(max = 100) String name,
             @Min(1) int perUserDrawLimit,
-            Long totalDrawLimit) {
+            @Positive Long totalDrawLimit) {
     }
 
     public record UpdateActivityRequest(
-            @NotBlank String name,
+            @NotBlank @Size(max = 100) String name,
             @NotNull ActivityStatus status,
             @Min(1) int perUserDrawLimit,
-            Long totalDrawLimit) {
+            @Positive Long totalDrawLimit) {
     }
 
     public record CreatePrizeRequest(
-            @NotBlank String name,
+            @NotBlank @Size(max = 100) String name,
             @NotBlank String type,
-            @Min(0) @Max(10_000) int probability,
+            @Min(1) @Max(10_000) int probability,
             @Min(0) int totalStock) {
     }
 
     public record UpdatePrizeRequest(
-            @NotBlank String name,
+            @NotBlank @Size(max = 100) String name,
             @Min(0) @Max(10_000) int probability,
             @Min(0) int totalStock,
             @Min(0) int remainingStock) {
