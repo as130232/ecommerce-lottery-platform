@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -72,6 +73,13 @@ public class AdminController {
     public ApiResponse<PrizeView> updatePrize(@PathVariable Long prizeId,
                                               @Valid @RequestBody UpdatePrizeRequest req) {
         return ApiResponse.ok(PrizeView.from(adminService.updatePrize(prizeId, req)));
+    }
+
+    @DeleteMapping("/prizes/{prizeId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "刪除獎品（無抽獎紀錄才可刪）")
+    public void deletePrize(@PathVariable Long prizeId) {
+        adminService.deletePrize(prizeId);
     }
 
     @GetMapping("/activities/{id}/stats")

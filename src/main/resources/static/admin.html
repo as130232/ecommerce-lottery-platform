@@ -72,7 +72,7 @@
         </div>
 
         <div class="card" id="editCard" style="display:none">
-            <h3 id="editTitle"></h3>
+            <h3><span id="editTitle"></span> <button class="ghost mini" onclick="selectActivity(selectedId)">↻ 刷新</button></h3>
             <div>
                 <label>名稱</label><input id="ea_name"/>
                 <label>狀態</label>
@@ -84,11 +84,12 @@
                 <button onclick="saveActivity()">儲存活動</button>
                 <span class="flash" id="editMsg"></span>
             </div>
-            <p class="muted" style="margin:8px 0 0">提示：狀態設為 ACTIVE 時，後端會驗證所有獎品機率總和必須等於 10000。</p>
+            <p class="muted" style="margin:8px 0 0">提示：機率以百分比（%）輸入，最小 0.01%，總和須為 100%。狀態設為 ACTIVE 時後端會進行驗證。</p>
 
             <h3 style="margin-top:18px">獎品設定 <span id="sumInfo" class="flash"></span></h3>
+            <div id="probWarn" style="display:none; color:#c8102e; font-size:13px; margin:4px 0 8px; font-weight:600;"></div>
             <table>
-                <thead><tr><th>ID</th><th>名稱</th><th>類型</th><th>機率(萬分比)</th><th>總庫存</th><th>剩餘</th><th></th></tr></thead>
+                <thead><tr><th>ID</th><th>名稱</th><th>類型</th><th>機率(%)</th><th>總庫存</th><th>剩餘</th><th></th></tr></thead>
                 <tbody id="prizeRows"></tbody>
             </table>
 
@@ -96,7 +97,7 @@
                 <strong style="font-size:13px">新增獎品：</strong>
                 <input id="np_name" placeholder="名稱"/>
                 <select id="np_type"><option>PRIZE</option><option>THANKS</option></select>
-                <input id="np_prob" class="sm" type="number" placeholder="機率"/>
+                <input id="np_prob" class="sm" type="number" placeholder="機率(%)" step="0.01" min="0.01" max="100"/>
                 <input id="np_stock" class="sm" type="number" placeholder="庫存"/>
                 <button class="mini" onclick="addPrize()">新增</button>
                 <span class="flash" id="addPrizeMsg"></span>
@@ -117,7 +118,10 @@
         if (token) options.headers["Authorization"] = "Bearer " + token;
         const res = await fetch(path, options);
         const body = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(body.message || ("HTTP " + res.status));
+        if (!res.ok) {
+            if (res.status === 401 && path !== "/api/auth/login") autoLogout();
+            throw new Error(body.message || ("HTTP " + res.status));
+        }
         return body.data;
     }
 
@@ -129,18 +133,25 @@
 
     async function login() {
         try {
+            const username = document.getElementById("username").value;
             const data = await api("/api/auth/login", { method: "POST",
-                body: JSON.stringify({ username: document.getElementById("username").value,
+                body: JSON.stringify({ username,
                                        password: document.getElementById("password").value }) });
             token = data.accessToken;
-            document.getElementById("loginCard").style.display = "none";
-            document.getElementById("usernameDisplay").textContent = document.getElementById("username").value;
-            document.getElementById("userInfo").style.display = "flex";
-            document.getElementById("console").style.display = "block";
+            localStorage.setItem("lotteryToken", token);
+            localStorage.setItem("lotteryUser", username);
+            showConsole(username);
             await loadActivities();
         } catch (e) {
             flash("loginMsg", "登入失敗：" + e.message, false);
         }
+    }
+
+    function showConsole(username) {
+        document.getElementById("loginCard").style.display = "none";
+        document.getElementById("usernameDisplay").textContent = username;
+        document.getElementById("userInfo").style.display = "flex";
+        document.getElementById("console").style.display = "block";
     }
 
     async function loadActivities() {
@@ -203,35 +214,59 @@
         }
     }
 
+    function warnIfProbTooLow(val) {
+        const warn = document.getElementById("probWarn");
+        if (Number(val) < 0.01) {
+            warn.textContent = "⚠️ 機率不可低於 0.01%";
+            warn.style.display = "block";
+        } else {
+            warn.style.display = "none";
+        }
+    }
+
     function renderPrizes(prizes) {
         const tbody = document.getElementById("prizeRows");
         tbody.innerHTML = "";
         let sum = 0;
         prizes.forEach(p => {
             sum += p.probability;
+            const displayProb = (p.probability / 100).toFixed(2);
             const tr = document.createElement("tr");
             tr.innerHTML = `
                 <td>${p.id}</td>
                 <td><input value="${p.name}" data-f="name"/></td>
                 <td>${p.type}</td>
-                <td><input class="sm" type="number" value="${p.probability}" data-f="prob"/></td>
+                <td><input class="sm" type="number" value="${displayProb}" step="0.01" min="0.01" max="100" data-f="prob"/></td>
                 <td><input class="sm" type="number" value="${p.totalStock}" data-f="total"/></td>
                 <td><input class="sm" type="number" value="${p.remainingStock}" data-f="remain"/></td>
-                <td><button class="mini" data-id="${p.id}">儲存</button></td>`;
-            tr.querySelector("button").onclick = () => savePrize(p.id, tr);
+                <td style="white-space:nowrap">
+                    <button class="mini" data-save>儲存</button>
+                    <button class="mini ghost" data-del style="margin-left:4px">刪除</button>
+                </td>`;
+            tr.querySelector("[data-f='prob']").addEventListener("input", function() {
+                warnIfProbTooLow(this.value);
+            });
+            tr.querySelector("[data-save]").onclick = () => savePrize(p.id, tr);
+            tr.querySelector("[data-del]").onclick = () => deletePrize(p.id, p.name);
             tbody.appendChild(tr);
         });
         const info = document.getElementById("sumInfo");
-        info.textContent = `機率總和：${sum} / 10000`;
+        const displaySum = (sum / 100).toFixed(2);
+        info.textContent = `機率總和：${displaySum} / 100.00%`;
         info.className = "flash " + (sum === 10000 ? "sum-ok" : "sum-bad");
     }
 
     async function savePrize(prizeId, tr) {
         const get = f => tr.querySelector(`[data-f="${f}"]`).value;
+        const probPct = Number(get("prob"));
+        if (probPct < 0.01) {
+            warnIfProbTooLow(probPct);
+            return;
+        }
         try {
             await api("/api/admin/prizes/" + prizeId, { method: "PUT", body: JSON.stringify({
                 name: get("name"),
-                probability: Number(get("prob")),
+                probability: Math.round(probPct * 100),
                 totalStock: Number(get("total")),
                 remainingStock: Number(get("remain"))
             }) });
@@ -241,12 +276,28 @@
         }
     }
 
+    async function deletePrize(prizeId, prizeName) {
+        if (!confirm(`確定刪除獎品「${prizeName}」？此操作不可復原。`)) return;
+        try {
+            await api("/api/admin/prizes/" + prizeId, { method: "DELETE" });
+            await selectActivity(selectedId);
+        } catch (e) {
+            alert("刪除失敗：" + e.message);
+        }
+    }
+
     async function addPrize() {
+        const probPct = Number(document.getElementById("np_prob").value);
+        if (probPct < 0.01) {
+            warnIfProbTooLow(probPct);
+            flash("addPrizeMsg", "機率不可低於 0.01%", false);
+            return;
+        }
         try {
             await api("/api/admin/activities/" + selectedId + "/prizes", { method: "POST", body: JSON.stringify({
                 name: document.getElementById("np_name").value,
                 type: document.getElementById("np_type").value,
-                probability: Number(document.getElementById("np_prob").value),
+                probability: Math.round(probPct * 100),
                 totalStock: Number(document.getElementById("np_stock").value || 0)
             }) });
             flash("addPrizeMsg", "已新增", true);
@@ -259,11 +310,31 @@
     function logout() {
         token = null;
         selectedId = null;
+        localStorage.removeItem("lotteryToken");
+        localStorage.removeItem("lotteryUser");
         document.getElementById("loginCard").style.display = "block";
         document.getElementById("console").style.display = "none";
         document.getElementById("userInfo").style.display = "none";
         document.getElementById("usernameDisplay").textContent = "";
     }
+
+    function autoLogout() {
+        logout();
+    }
+
+    document.addEventListener("DOMContentLoaded", async () => {
+        const savedToken = localStorage.getItem("lotteryToken");
+        const savedUser = localStorage.getItem("lotteryUser");
+        if (savedToken && savedUser) {
+            token = savedToken;
+            showConsole(savedUser);
+            try {
+                await loadActivities();
+            } catch (e) {
+                autoLogout();
+            }
+        }
+    });
 
     async function loadStats(id) {
         try {

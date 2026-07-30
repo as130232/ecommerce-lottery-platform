@@ -95,7 +95,10 @@
         if (token) options.headers["Authorization"] = "Bearer " + token;
         const res = await fetch(path, options);
         const body = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(body.message || ("HTTP " + res.status));
+        if (!res.ok) {
+            if (res.status === 401 && path !== "/api/auth/login") autoLogout();
+            throw new Error(body.message || ("HTTP " + res.status));
+        }
         return body.data;
     }
 
@@ -106,15 +109,21 @@
             const data = await api("/api/auth/login", { method: "POST",
                 body: JSON.stringify({ username, password }) });
             token = data.accessToken;
-            document.getElementById("loginCard").style.display = "none";
-            document.getElementById("usernameDisplay").textContent = username;
-            document.getElementById("userInfo").style.display = "flex";
-            document.getElementById("gameCard").style.display = "block";
-            document.getElementById("recordCard").style.display = "block";
+            localStorage.setItem("lotteryToken", token);
+            localStorage.setItem("lotteryUser", username);
+            showConsole(username);
             await loadActivities();
         } catch (e) {
             document.getElementById("loginMsg").textContent = "登入失敗：" + e.message;
         }
+    }
+
+    function showConsole(username) {
+        document.getElementById("loginCard").style.display = "none";
+        document.getElementById("usernameDisplay").textContent = username;
+        document.getElementById("userInfo").style.display = "flex";
+        document.getElementById("gameCard").style.display = "block";
+        document.getElementById("recordCard").style.display = "block";
     }
 
     // populate the activity dropdown with the currently ACTIVE activities
@@ -265,6 +274,8 @@
 
     function logout() {
         token = null;
+        localStorage.removeItem("lotteryToken");
+        localStorage.removeItem("lotteryUser");
         document.getElementById("loginCard").style.display = "block";
         document.getElementById("gameCard").style.display = "none";
         document.getElementById("recordCard").style.display = "none";
@@ -272,6 +283,24 @@
         document.getElementById("usernameDisplay").textContent = "";
         document.getElementById("loginMsg").textContent = "";
     }
+
+    function autoLogout() {
+        logout();
+    }
+
+    document.addEventListener("DOMContentLoaded", async () => {
+        const savedToken = localStorage.getItem("lotteryToken");
+        const savedUser = localStorage.getItem("lotteryUser");
+        if (savedToken && savedUser) {
+            token = savedToken;
+            showConsole(savedUser);
+            try {
+                await loadActivities();
+            } catch (e) {
+                autoLogout();
+            }
+        }
+    });
 </script>
 </body>
 </html>

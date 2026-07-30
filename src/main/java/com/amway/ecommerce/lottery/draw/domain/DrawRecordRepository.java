@@ -16,4 +16,6 @@ public interface DrawRecordRepository extends JpaRepository<DrawRecord, Long> {
     long countByActivityId(Long activityId);
 
     long countByActivityIdAndResult(Long activityId, DrawResult result);
+
+    boolean existsByPrizeId(Long prizeId);
 }

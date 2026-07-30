@@ -99,6 +99,19 @@ public class AdminService {
         return saved;
     }
 
+    @Transactional
+    public void deletePrize(Long prizeId) {
+        Prize prize = prizeRepository.findById(prizeId)
+                .orElseThrow(() -> new ResourceNotFoundException("獎品不存在: " + prizeId));
+        if (drawRecordRepository.existsByPrizeId(prizeId)) {
+            throw new BusinessException(ErrorCode.CONFLICT, "獎品已有抽獎紀錄，無法刪除");
+        }
+        prizeRepository.delete(prize);
+        if (!prize.isThanks()) {
+            riskControl.initStock(prizeId, 0);
+        }
+    }
+
     @Transactional(readOnly = true)
     public StatsView stats(Long activityId) {
         LotteryActivity activity = getActivity(activityId);
