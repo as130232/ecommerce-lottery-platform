@@ -62,8 +62,21 @@ public class DrawService {
             throw new ActivityNotOpenException("活動目前未開放抽獎");
         }
 
-        // 2) reserve the user's draw quota atomically (per-user limit guard)
+        // 2) reserve against the activity-wide cap (if the activity sets one)
+        Long totalLimit = activity.getTotalDrawLimit();
+        boolean activityReserved = false;
+        if (totalLimit != null) {
+            if (!riskControl.tryReserveActivityTotal(activityId, totalLimit, times)) {
+                throw new DrawLimitExceededException("本活動整體抽獎次數已達上限");
+            }
+            activityReserved = true;
+        }
+
+        // 3) reserve the user's draw quota atomically (per-user limit guard)
         if (!riskControl.tryReserveUserQuota(activityId, userId, activity.getPerUserDrawLimit(), times)) {
+            if (activityReserved) {
+                riskControl.releaseActivityTotal(activityId, times);
+            }
             throw new DrawLimitExceededException("已達個人抽獎次數上限");
         }
 
@@ -72,6 +85,9 @@ public class DrawService {
         } catch (RuntimeException ex) {
             // release the reserved quota so a failed request doesn't burn the user's chances
             riskControl.releaseUserQuota(activityId, userId, times);
+            if (activityReserved) {
+                riskControl.releaseActivityTotal(activityId, times);
+            }
             throw ex;
         }
     }

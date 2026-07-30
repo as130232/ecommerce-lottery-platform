@@ -21,6 +21,16 @@ public interface RiskControlPort {
     void releaseUserQuota(long activityId, long userId, int times);
 
     /**
+     * Atomically reserve {@code times} draws against the activity-wide cap.
+     *
+     * @return true when the reservation fits within {@code totalLimit}
+     */
+    boolean tryReserveActivityTotal(long activityId, long totalLimit, int times);
+
+    /** Give back {@code times} activity-wide draws (compensation on failure). */
+    void releaseActivityTotal(long activityId, int times);
+
+    /**
      * Atomically deduct one unit of stock for a prize.
      *
      * @return true when a unit was reserved, false when sold out

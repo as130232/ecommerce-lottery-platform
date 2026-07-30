@@ -116,6 +116,36 @@ class DrawServiceTest {
     }
 
     @Test
+    void rejectsWhenActivityTotalLimitReached() {
+        activity.setTotalDrawLimit(5L);
+        when(drawRecordRepository.findByIdempotencyKeyStartingWith(any())).thenReturn(List.of());
+        when(activityRepository.findById(1L)).thenReturn(java.util.Optional.of(activity));
+        when(riskControl.tryReserveActivityTotal(anyLong(), anyLong(), anyInt())).thenReturn(false);
+
+        DrawService service = serviceThatPicksRealPrize();
+        assertThatThrownBy(() -> service.draw(1L, 99L, 2, "req-5"))
+                .isInstanceOf(DrawLimitExceededException.class);
+
+        verify(riskControl, never()).tryReserveUserQuota(anyLong(), anyLong(), anyInt(), anyInt());
+        verify(drawRecordRepository, never()).save(any());
+    }
+
+    @Test
+    void releasesActivityTotalWhenUserQuotaExceeded() {
+        activity.setTotalDrawLimit(5L);
+        when(drawRecordRepository.findByIdempotencyKeyStartingWith(any())).thenReturn(List.of());
+        when(activityRepository.findById(1L)).thenReturn(java.util.Optional.of(activity));
+        when(riskControl.tryReserveActivityTotal(anyLong(), anyLong(), anyInt())).thenReturn(true);
+        when(riskControl.tryReserveUserQuota(anyLong(), anyLong(), anyInt(), anyInt())).thenReturn(false);
+
+        DrawService service = serviceThatPicksRealPrize();
+        assertThatThrownBy(() -> service.draw(1L, 99L, 2, "req-6"))
+                .isInstanceOf(DrawLimitExceededException.class);
+
+        verify(riskControl).releaseActivityTotal(1L, 2);
+    }
+
+    @Test
     void replaysIdempotentRequestWithoutDrawingAgain() {
         DrawRecord prior = new DrawRecord(1L, 99L, 1L, DrawResult.WIN, "req-4#0");
         when(drawRecordRepository.findByIdempotencyKeyStartingWith("req-4#")).thenReturn(List.of(prior));
