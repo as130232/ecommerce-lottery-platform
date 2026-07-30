@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>抽獎後台設定</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif;
+               margin: 0; background: #f4f5f7; color: #222; }
+        header { background: #333; color: #fff; padding: 14px 20px; font-weight: 600;
+                 display: flex; justify-content: space-between; }
+        header a { color: #ffd; font-size: 13px; }
+        .wrap { max-width: 900px; margin: 0 auto; padding: 20px; }
+        .card { background: #fff; border-radius: 10px; padding: 18px; margin-bottom: 18px;
+                box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+        h3 { margin: 0 0 12px; }
+        label { font-size: 13px; color: #555; margin-right: 4px; }
+        input, select { padding: 7px; border: 1px solid #ccc; border-radius: 6px; margin: 3px 8px 3px 0; }
+        input.sm { width: 90px; }
+        button { background: #c8102e; color: #fff; border: none; border-radius: 6px;
+                 padding: 8px 14px; cursor: pointer; font-size: 13px; }
+        button.ghost { background: #fff; color: #333; border: 1px solid #999; }
+        button.mini { padding: 5px 10px; font-size: 12px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        th, td { border-bottom: 1px solid #eee; padding: 6px 4px; text-align: left; font-size: 13px; }
+        .muted { color: #888; font-size: 13px; }
+        .rowline { padding: 8px; border: 1px solid #eee; border-radius: 6px; margin: 6px 0; cursor: pointer; }
+        .rowline:hover { background: #fafafa; }
+        .rowline.active { border-color: #c8102e; background: #fff7f8; }
+        .sum-ok { color: #27ae60; font-weight: 600; }
+        .sum-bad { color: #c8102e; font-weight: 600; }
+        .flash { font-size: 13px; margin-left: 8px; }
+    </style>
+</head>
+<body>
+<header>
+    <span>🛠️ 抽獎後台設定（ADMIN）</span>
+    <a href="/">← 回轉盤前台</a>
+</header>
+<div class="wrap">
+    <div class="card" id="loginCard">
+        <h3>管理員登入</h3>
+        <label>帳號</label><input id="username" value="admin"/>
+        <label>密碼</label><input id="password" type="password" value="admin123"/>
+        <button onclick="login()">登入</button>
+        <span class="flash muted" id="loginMsg"></span>
+    </div>
+
+    <div id="console" style="display:none">
+        <div class="card">
+            <h3>建立新活動</h3>
+            <label>代碼</label><input id="na_code" class="sm" placeholder="AUTUMN2026"/>
+            <label>名稱</label><input id="na_name" placeholder="秋季抽獎"/>
+            <label>每人上限</label><input id="na_peruser" class="sm" type="number" value="10"/>
+            <label>活動總上限</label><input id="na_total" class="sm" type="number" placeholder="(可空)"/>
+            <button onclick="createActivity()">建立</button>
+            <span class="flash" id="createMsg"></span>
+        </div>
+
+        <div class="card">
+            <h3>活動列表 <button class="ghost mini" onclick="loadActivities()">重新整理</button></h3>
+            <div id="activityList" class="muted">載入中…</div>
+        </div>
+
+        <div class="card" id="editCard" style="display:none">
+            <h3 id="editTitle"></h3>
+            <div>
+                <label>名稱</label><input id="ea_name"/>
+                <label>狀態</label>
+                <select id="ea_status">
+                    <option>DRAFT</option><option>ACTIVE</option><option>ENDED</option>
+                </select>
+                <label>每人上限</label><input id="ea_peruser" class="sm" type="number"/>
+                <label>總上限</label><input id="ea_total" class="sm" type="number" placeholder="(可空)"/>
+                <button onclick="saveActivity()">儲存活動</button>
+                <span class="flash" id="editMsg"></span>
+            </div>
+            <p class="muted" style="margin:8px 0 0">提示：狀態設為 ACTIVE 時，後端會驗證所有獎品機率總和必須等於 10000。</p>
+
+            <h3 style="margin-top:18px">獎品設定 <span id="sumInfo" class="flash"></span></h3>
+            <table>
+                <thead><tr><th>ID</th><th>名稱</th><th>類型</th><th>機率(萬分比)</th><th>總庫存</th><th>剩餘</th><th></th></tr></thead>
+                <tbody id="prizeRows"></tbody>
+            </table>
+
+            <div style="margin-top:12px">
+                <strong style="font-size:13px">新增獎品：</strong>
+                <input id="np_name" placeholder="名稱"/>
+                <select id="np_type"><option>PRIZE</option><option>THANKS</option></select>
+                <input id="np_prob" class="sm" type="number" placeholder="機率"/>
+                <input id="np_stock" class="sm" type="number" placeholder="庫存"/>
+                <button class="mini" onclick="addPrize()">新增</button>
+                <span class="flash" id="addPrizeMsg"></span>
+            </div>
+
+            <h3 style="margin-top:18px">統計</h3>
+            <div id="statsBox" class="muted"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let token = null;
+    let selectedId = null;
+
+    async function api(path, options = {}) {
+        options.headers = Object.assign({ "Content-Type": "application/json" }, options.headers || {});
+        if (token) options.headers["Authorization"] = "Bearer " + token;
+        const res = await fetch(path, options);
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.message || ("HTTP " + res.status));
+        return body.data;
+    }
+
+    function flash(id, msg, ok = true) {
+        const el = document.getElementById(id);
+        el.textContent = msg;
+        el.className = "flash " + (ok ? "sum-ok" : "sum-bad");
+    }
+
+    async function login() {
+        try {
+            const data = await api("/api/auth/login", { method: "POST",
+                body: JSON.stringify({ username: document.getElementById("username").value,
+                                       password: document.getElementById("password").value }) });
+            token = data.accessToken;
+            document.getElementById("console").style.display = "block";
+            document.getElementById("loginMsg").textContent = "登入成功";
+            await loadActivities();
+        } catch (e) {
+            flash("loginMsg", "登入失敗：" + e.message, false);
+        }
+    }
+
+    async function loadActivities() {
+        const list = await api("/api/admin/activities");
+        const box = document.getElementById("activityList");
+        box.innerHTML = "";
+        list.forEach(a => {
+            const div = document.createElement("div");
+            div.className = "rowline" + (a.id === selectedId ? " active" : "");
+            div.textContent = `#${a.id} [${a.status}] ${a.code} - ${a.name}（每人 ${a.perUserDrawLimit} 次）`;
+            div.onclick = () => selectActivity(a.id);
+            box.appendChild(div);
+        });
+        if (!list.length) box.textContent = "尚無活動";
+    }
+
+    async function createActivity() {
+        try {
+            const totalRaw = document.getElementById("na_total").value;
+            await api("/api/admin/activities", { method: "POST", body: JSON.stringify({
+                code: document.getElementById("na_code").value,
+                name: document.getElementById("na_name").value,
+                perUserDrawLimit: Number(document.getElementById("na_peruser").value),
+                totalDrawLimit: totalRaw ? Number(totalRaw) : null
+            }) });
+            flash("createMsg", "已建立", true);
+            await loadActivities();
+        } catch (e) {
+            flash("createMsg", e.message, false);
+        }
+    }
+
+    async function selectActivity(id) {
+        selectedId = id;
+        await loadActivities();
+        const detail = await api("/api/activities/" + id);
+        document.getElementById("editCard").style.display = "block";
+        document.getElementById("editTitle").textContent = `編輯活動 #${id}：${detail.name}`;
+        document.getElementById("ea_name").value = detail.name;
+        document.getElementById("ea_status").value = detail.status;
+        document.getElementById("ea_peruser").value = detail.perUserDrawLimit;
+        document.getElementById("ea_total").value = detail.totalDrawLimit ?? "";
+        renderPrizes(detail.prizes);
+        loadStats(id);
+    }
+
+    async function saveActivity() {
+        try {
+            const totalRaw = document.getElementById("ea_total").value;
+            await api("/api/admin/activities/" + selectedId, { method: "PUT", body: JSON.stringify({
+                name: document.getElementById("ea_name").value,
+                status: document.getElementById("ea_status").value,
+                perUserDrawLimit: Number(document.getElementById("ea_peruser").value),
+                totalDrawLimit: totalRaw ? Number(totalRaw) : null
+            }) });
+            flash("editMsg", "已儲存", true);
+            await loadActivities();
+        } catch (e) {
+            flash("editMsg", e.message, false);
+        }
+    }
+
+    function renderPrizes(prizes) {
+        const tbody = document.getElementById("prizeRows");
+        tbody.innerHTML = "";
+        let sum = 0;
+        prizes.forEach(p => {
+            sum += p.probability;
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td>${p.id}</td>
+                <td><input value="${p.name}" data-f="name"/></td>
+                <td>${p.type}</td>
+                <td><input class="sm" type="number" value="${p.probability}" data-f="prob"/></td>
+                <td><input class="sm" type="number" value="${p.totalStock}" data-f="total"/></td>
+                <td><input class="sm" type="number" value="${p.remainingStock}" data-f="remain"/></td>
+                <td><button class="mini" data-id="${p.id}">儲存</button></td>`;
+            tr.querySelector("button").onclick = () => savePrize(p.id, tr);
+            tbody.appendChild(tr);
+        });
+        const info = document.getElementById("sumInfo");
+        info.textContent = `機率總和：${sum} / 10000`;
+        info.className = "flash " + (sum === 10000 ? "sum-ok" : "sum-bad");
+    }
+
+    async function savePrize(prizeId, tr) {
+        const get = f => tr.querySelector(`[data-f="${f}"]`).value;
+        try {
+            await api("/api/admin/prizes/" + prizeId, { method: "PUT", body: JSON.stringify({
+                name: get("name"),
+                probability: Number(get("prob")),
+                totalStock: Number(get("total")),
+                remainingStock: Number(get("remain"))
+            }) });
+            await selectActivity(selectedId);
+        } catch (e) {
+            alert("儲存獎品失敗：" + e.message);
+        }
+    }
+
+    async function addPrize() {
+        try {
+            await api("/api/admin/activities/" + selectedId + "/prizes", { method: "POST", body: JSON.stringify({
+                name: document.getElementById("np_name").value,
+                type: document.getElementById("np_type").value,
+                probability: Number(document.getElementById("np_prob").value),
+                totalStock: Number(document.getElementById("np_stock").value || 0)
+            }) });
+            flash("addPrizeMsg", "已新增", true);
+            await selectActivity(selectedId);
+        } catch (e) {
+            flash("addPrizeMsg", e.message, false);
+        }
+    }
+
+    async function loadStats(id) {
+        try {
+            const s = await api("/api/admin/activities/" + id + "/stats");
+            const lines = s.prizes.map(p => `${p.name}：已中 ${p.awarded} / 總 ${p.totalStock}（剩 ${p.remainingStock}）`);
+            document.getElementById("statsBox").innerHTML =
+                `總抽獎 ${s.totalDraws} 次、銘謝惠顧 ${s.thanksCount} 次<br>` + lines.join("<br>");
+        } catch (e) { /* ignore */ }
+    }
+</script>
+</body>
+</html>

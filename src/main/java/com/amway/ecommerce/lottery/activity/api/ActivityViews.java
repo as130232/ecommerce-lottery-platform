@@ -19,10 +19,11 @@ public final class ActivityViews {
         }
     }
 
-    public record PrizeView(Long id, String name, String type, int probability, int remainingStock) {
+    public record PrizeView(Long id, String name, String type, int probability, int totalStock,
+                            int remainingStock) {
         public static PrizeView from(Prize p) {
             return new PrizeView(p.getId(), p.getName(), p.getType().name(), p.getProbability(),
-                    p.getRemainingStock());
+                    p.getTotalStock(), p.getRemainingStock());
         }
     }
 

@@ -24,7 +24,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private static final String[] PUBLIC_PATHS = {
-            "/", "/index.html", "/favicon.ico", "/*.js", "/*.css",
+            "/", "/*.html", "/favicon.ico", "/*.js", "/*.css",
             "/api/auth/**",
             "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**",
             "/actuator/health", "/actuator/health/**", "/actuator/info"

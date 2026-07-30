@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -36,6 +37,12 @@ public class AdminController {
 
     public AdminController(AdminService adminService) {
         this.adminService = adminService;
+    }
+
+    @GetMapping("/activities")
+    @Operation(summary = "列出所有活動（含未上架 DRAFT）")
+    public ApiResponse<List<ActivitySummary>> listActivities() {
+        return ApiResponse.ok(adminService.listActivities().stream().map(ActivitySummary::from).toList());
     }
 
     @PostMapping("/activities")

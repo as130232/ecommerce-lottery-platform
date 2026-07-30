@@ -40,6 +40,11 @@ public class AdminService {
         this.riskControl = riskControl;
     }
 
+    @Transactional(readOnly = true)
+    public List<LotteryActivity> listActivities() {
+        return activityRepository.findAll();
+    }
+
     @Transactional
     public LotteryActivity createActivity(CreateActivityRequest req) {
         activityRepository.findByCode(req.code()).ifPresent(a -> {
