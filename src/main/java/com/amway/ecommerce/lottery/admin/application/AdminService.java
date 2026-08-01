@@ -154,7 +154,6 @@ public class AdminService {
 
     private void validateProbabilities(Long activityId) {
         List<Integer> probabilities = prizeRepository.findByActivityId(activityId).stream()
-                .filter(p -> !p.isThanks())
                 .map(Prize::getProbability)
                 .toList();
         ProbabilityConfigValidator.validate(probabilities);
