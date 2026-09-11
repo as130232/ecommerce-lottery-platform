@@ -26,6 +26,9 @@ public class StockCacheWarmer implements ApplicationRunner {
         this.riskControl = riskControl;
     }
 
+    /**
+     * 將DB資料緩存至redis
+     */
     @Override
     public void run(ApplicationArguments args) {
         int warmed = 0;
